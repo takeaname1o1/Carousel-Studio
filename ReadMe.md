@@ -1,6 +1,7 @@
-[UI Demo](static/demo.gif)
+![UI Demo](static/demo.gif)
 
-# Carousel Studio (https://fekig212.pythonanywhere.com/)
+# 🚀 Carousel Studio  
+**Live Demo:** https://fekig212.pythonanywhere.com/
 
 **Carousel Studio** is a local-first, privacy-focused web application designed to create seamless Instagram swipeable panoramas. It allows users to stitch multiple images together, edit them, reorder them, and automatically slice them into perfectly sized 4:5 portrait slides (1080x1350) for Instagram.
 
