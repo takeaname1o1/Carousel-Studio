@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#09090b">
+    <meta name="description" content="Offline, local-only Instagram Carousel stitcher.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Carousel Studio</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Libraries -->
+    <!-- Cropper.js: For editing images -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <!-- Sortable.js: For dragging order -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- JSZip & FileSaver: For Desktop/Fallback export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- Lucide: Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- HEIC2ANY: iOS Image Support -->
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#09090b',
+                        surface: '#18181b',
+                        border: '#27272a',
+                        primary: '#6366f1',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base Reset & Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #09090b;
+            color: #f4f4f5;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none; /* Prevents pull-to-refresh */
+        }
+
+        /* Platform Specific Scrollbar Hiding */
+        .scroller {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE */
+        }
+        .scroller::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
+
+        /* UI Patterns */
+        .bg-dots {
+            background-image: radial-gradient(#27272a 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Cropper Customization */
+        .cropper-bg { background: #000; }
+        .cropper-modal { opacity: 0.9; background: #09090b; }
+        .cropper-view-box { outline: 2px solid #6366f1; }
+        .cropper-point { background-color: #6366f1; width: 8px; height: 8px; }
+
+        /* Safe Areas for iPhone X+ */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .pt-safe { padding-top: env(safe-area-inset-top, 20px); }
+
+        /* Slider Input Styling */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%;
+            background: #fff; cursor: pointer; margin-top: -7px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; background: #3f3f46; border-radius: 2px;
+        }
+
+        /* Drag & Drop Visuals */
+        .sortable-ghost { opacity: 0.2; }
+        .sortable-drag { cursor: grabbing; scale: 1.05; z-index: 50; }
+
+        /* Drag Zone Highlight */
+        .drag-active .drop-zone {
+            border-color: #6366f1;
+            background-color: rgba(99, 102, 241, 0.1);
+        }
+    </style>
+</head>
+<body class="h-[100dvh] flex flex-col overflow-hidden selection:bg-indigo-500/30">
+
+    <!-- Navbar -->
+    <nav class="flex-none h-14 pt-safe border-b border-border bg-background/90 backdrop-blur-md z-40 flex items-center justify-between px-4">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="window.location.reload()">
+            <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i data-lucide="layers" class="text-white w-4 h-4"></i>
+            </div>
+            <span class="font-bold text-lg tracking-tight text-white">2212070_Project</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <span id="osBadge" class="hidden md:inline-flex text-[10px] uppercase font-mono bg-zinc-800 text-zinc-400 px-2 py-1 rounded">Local</span>
+
+            <button id="navAddBtn" onclick="dom.fileInput.click()" class="hidden items-center justify-center w-9 h-9 bg-zinc-800 rounded-full text-gray-300 active:scale-95 transition hover:bg-zinc-700">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+            </button>
+
+            <button onclick="handleExport()" id="exportBtn" class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 px-4 py-1.5 bg-white text-black rounded-full text-sm font-bold shadow-lg shadow-white/5 active:scale-95 transition hover:bg-gray-100">
+                <span id="exportText">Share</span>
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Workspace -->
+    <main id="mainDropZone" class="flex-1 relative bg-dots overflow-hidden flex flex-col transition-colors duration-200">
+
+        <!-- Controls Toolbar (Floating) -->
+        <div id="controlsToolbar" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 animate-slide-up">
+            <div class="bg-black/70 backdrop-blur-xl border border-white/10 rounded-full px-5 py-2 shadow-2xl flex items-center gap-4">
+                <i data-lucide="zoom-in" class="w-4 h-4 text-gray-400"></i>
+                <input type="range" id="zoomSlider" min="150" max="500" value="300" step="10" class="w-32">
+            </div>
+        </div>
+
+        <!-- Empty State / Drop Zone -->
+        <div id="emptyState" class="drop-zone absolute inset-0 flex flex-col items-center justify-center p-6 text-center animate-fade-in z-10 border-2 border-transparent transition-all duration-200">
+            <div class="relative w-24 h-24 mb-6 group cursor-pointer" onclick="dom.fileInput.click()">
+                <div class="absolute inset-0 bg-indigo-500/20 rounded-3xl rotate-6 blur-xl animate-pulse-slow"></div>
+                <div class="relative w-full h-full bg-surface border border-border rounded-3xl flex items-center justify-center shadow-2xl active:scale-95 transition-transform duration-300 ring-1 ring-white/10 group-hover:border-indigo-500/50">
+                    <i data-lucide="image-plus" class="w-10 h-10 text-indigo-400"></i>
+                </div>
+            </div>
+
+            <h1 class="text-2xl font-bold mb-2 text-white">Carousel Studio</h1>
+            <p id="instructionText" class="text-zinc-500 max-w-xs mb-8 text-sm leading-relaxed">Select photos to stitch.</p>
+
+            <button onclick="dom.fileInput.click()" class="w-full max-w-xs py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-base shadow-lg shadow-indigo-500/20 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                <i data-lucide="folder-open" class="w-5 h-5"></i>
+                <span>Select Photos</span>
+            </button>
+
+            <p class="mt-8 text-[10px] text-zinc-600 font-mono flex items-center gap-1">
+                <i data-lucide="shield-check" class="w-3 h-3"></i>
+                <span>PROCESSED ON DEVICE</span>
+            </p>
+
+            <input type="file" id="fileInput" multiple accept="image/*,.heic" class="hidden">
+        </div>
+
+        <!-- Canvas Area -->
+        <div id="workspace" class="hidden w-full h-full overflow-hidden flex flex-col justify-center relative touch-none">
+            <!-- Scroll Container -->
+            <div class="w-full h-full overflow-x-auto overflow-y-hidden flex items-center px-[5vw] scroller cursor-grab active:cursor-grabbing touch-pan-x">
+                <div id="slideContainer" class="flex items-center h-max w-max mx-auto transition-all duration-300 gap-1 pl-4 pr-10">
+                    <!-- Slides injected here -->
+                </div>
+            </div>
+
+            <!-- Instructions Overlay -->
+            <div class="absolute bottom-8 left-0 right-0 text-center pointer-events-none px-4">
+                <p class="text-[11px] text-zinc-400 bg-black/60 inline-block px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/5">
+                    Drag to reorder • Tap to edit
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Editor Modal -->
+    <div id="cropperModal" class="hidden fixed inset-0 z-50 bg-black flex flex-col animate-fade-in">
+        <div class="flex-none h-14 pt-safe px-4 flex items-center justify-between bg-zinc-900 border-b border-border z-10">
+            <button onclick="closeModal()" class="p-2 text-white hover:bg-white/10 rounded-full">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <span class="text-sm font-bold text-white">Adjust Crop</span>
+            <button onclick="applyCrop()" class="p-2 text-indigo-400 font-bold hover:bg-indigo-500/10 rounded-full">
+                Done
+            </button>
+        </div>
+        <div class="flex-1 relative bg-black overflow-hidden flex items-center justify-center p-4">
+            <img id="cropperImage" src="" class="max-w-full max-h-full opacity-0">
+        </div>
+        <div class="flex-none pb-safe bg-zinc-900 border-t border-border z-10">
+            <div class="grid grid-cols-4 gap-2 p-3 max-w-md mx-auto">
+                <button onclick="setRatio(4/5)" class="ratio-btn flex flex-col items-center gap-1 p-2 rounded bg-zinc-800 text-[10px] text-gray-300">
+                    <div class="w-2.5 h-3.5 border border-current"></div> 4:5
+                </button>
+                <button onclick="setRatio(1)" class="ratio-btn flex flex-col items-center gap-1 p-2 rounded bg-zinc-800/50 text-[10px] text-gray-500">
+                    <div class="w-3 h-3 border border-current"></div> 1:1
+                </button>
+                <button onclick="setRatio(NaN)" class="ratio-btn flex flex-col items-center gap-1 p-2 rounded bg-zinc-800/50 text-[10px] text-gray-500">
+                    <i data-lucide="maximize" class="w-3 h-3"></i> Free
+                </button>
+                <button onclick="rotateImage()" class="flex flex-col items-center gap-1 p-2 rounded bg-zinc-800/50 text-[10px] text-gray-500">
+                    <i data-lucide="rotate-cw" class="w-3 h-3"></i> Rotate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Processing Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur flex flex-col items-center justify-center text-white">
+        <div class="relative w-16 h-16 mb-4">
+            <div class="absolute inset-0 border-4 border-zinc-800 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <p class="font-medium animate-pulse" id="loadingText">Processing...</p>
+    </div>
+
+    <script>
+        // --- System State & Utils ---
+        const TARGET_HEIGHT = 1350;
+        const state = {
+            images: [],
+            cropper: null,
+            editingId: null,
+            zoom: 300,
+            os: 'unknown'
+        };
+
+        const dom = {
+            fileInput: document.getElementById('fileInput'),
+            workspace: document.getElementById('workspace'),
+            container: document.getElementById('slideContainer'),
+            emptyState: document.getElementById('emptyState'),
+            navAddBtn: document.getElementById('navAddBtn'),
+            modal: document.getElementById('cropperModal'),
+            cropperImg: document.getElementById('cropperImage'),
+            loading: document.getElementById('loadingOverlay'),
+            dropZone: document.getElementById('mainDropZone')
+        };
+
+        // --- OS & Capability Detection ---
+        function detectOS() {
+            const ua = navigator.userAgent;
+            if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return 'iOS';
+            if (/android/i.test(ua)) return 'Android';
+            if (/Mac|Win|Linux/.test(ua)) return 'Desktop';
+            return 'Other';
+        }
+
+        function initApp() {
+            state.os = detectOS();
+
+            // Adjust Instruction Text based on OS
+            const instructions = document.getElementById('instructionText');
+            if(state.os === 'Desktop') instructions.textContent = "Drag & drop photos or click to browse.";
+
+            // Adjust Export Button Text
+            const exportText = document.getElementById('exportText');
+            if (navigator.share && (state.os === 'iOS' || state.os === 'Android')) {
+                exportText.innerText = "Share";
+            } else {
+                exportText.innerText = "Download";
+            }
+
+            document.getElementById('osBadge').innerText = state.os;
+            lucide.createIcons();
+        }
+
+        // --- Event Listeners ---
+        window.onload = initApp;
+
+        // Zoom Control
+        document.getElementById('zoomSlider').addEventListener('input', (e) => {
+            state.zoom = parseInt(e.target.value);
+            renderSlides();
+        });
+
+        // File Input
+        dom.fileInput.addEventListener('change', (e) => processFiles(e.target.files));
+
+        // Drag & Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dom.dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dom.dropZone.addEventListener(eventName, () => dom.emptyState.classList.add('drag-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dom.dropZone.addEventListener(eventName, () => dom.emptyState.classList.remove('drag-active'), false);
+        });
+
+        dom.dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            processFiles(dt.files);
+        });
+
+
+        // --- Core Image Processing ---
+        async function processFiles(fileList) {
+            const files = Array.from(fileList);
+            if (!files.length) return;
+
+            showLoading(true, 'Reading images...');
+
+            for (let file of files) {
+                // HEIC Handler
+                if (file.name.toLowerCase().endsWith('.heic') || file.type === "image/heic") {
+                    try {
+                        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+                        file = new File([Array.isArray(blob)?blob[0]:blob], file.name.replace('.heic','.jpg'), { type: "image/jpeg" });
+                    } catch (e) { console.warn('HEIC Conversion failed', e); }
+                }
+
+                await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            // Calculate initial aspect ratio
+                            const aspect = img.naturalWidth / img.naturalHeight;
+                            state.images.push({
+                                id: Math.random().toString(36).substr(2, 9),
+                                src: e.target.result,
+                                originalSrc: e.target.result,
+                                width: TARGET_HEIGHT * aspect,
+                                height: TARGET_HEIGHT
+                            });
+                            resolve();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            updateUIState();
+            renderSlides();
+            showLoading(false);
+
+            // Auto-trigger export simulation on first load for UX
+            if(files.length > 0 && !localStorage.getItem('seen_export')) {
+                localStorage.setItem('seen_export', 'true');
+            }
+        }
+
+        function updateUIState() {
+            if (state.images.length > 0) {
+                dom.emptyState.classList.add('hidden');
+                dom.workspace.classList.remove('hidden');
+                dom.navAddBtn.classList.remove('hidden');
+                document.getElementById('controlsToolbar').classList.remove('hidden');
+            } else {
+                resetApp();
+            }
+        }
+
+        function renderSlides() {
+            dom.container.innerHTML = '';
+
+            state.images.forEach((img, index) => {
+                const aspect = img.width / img.height;
+                const el = document.createElement('div');
+                el.className = "relative flex-shrink-0 group select-none transition-transform active:scale-95";
+                el.style.height = `${state.zoom}px`;
+                el.style.width = `${state.zoom * aspect}px`;
+                el.setAttribute('data-id', img.id);
+
+                el.innerHTML = `
+                    <img src="${img.src}" class="w-full h-full object-cover rounded shadow-lg bg-zinc-800 pointer-events-none border border-white/5">
+                    <div class="absolute top-2 left-2 bg-black/50 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded border border-white/10 z-10">${index + 1}</div>
+                    <div onclick="openEditor('${img.id}')" class="absolute inset-0 z-0"></div>
+                    <button onclick="deleteSlide(event, '${img.id}')" class="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform z-20 hover:bg-red-600">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                `;
+                dom.container.appendChild(el);
+            });
+
+            if (state.sortable) state.sortable.destroy();
+            state.sortable = new Sortable(dom.container, {
+                animation: 200,
+                delay: 150, // Waits for touch to become drag
+                delayOnTouchOnly: true,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                direction: 'horizontal',
+                onEnd: (evt) => {
+                    const item = state.images.splice(evt.oldIndex, 1)[0];
+                    state.images.splice(evt.newIndex, 0, item);
+                    renderSlides();
+                }
+            });
+            lucide.createIcons();
+        }
+
+        // --- Editing Logic ---
+        function openEditor(id) {
+            const imgData = state.images.find(i => i.id === id);
+            if (!imgData) return;
+            state.editingId = id;
+            dom.cropperImg.src = imgData.originalSrc;
+            dom.modal.classList.remove('hidden');
+
+            if (state.cropper) state.cropper.destroy();
+            state.cropper = new Cropper(dom.cropperImg, {
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                background: false,
+                ready() { this.cropper.setAspectRatio(NaN); highlightRatioBtn(2); }
+            });
+        }
+
+        function applyCrop() {
+            if (!state.cropper) return;
+            const canvas = state.cropper.getCroppedCanvas({ height: TARGET_HEIGHT, imageSmoothingQuality: 'high' });
+            const index = state.images.findIndex(i => i.id === state.editingId);
+            if (index !== -1) {
+                state.images[index].src = canvas.toDataURL('image/jpeg', 0.92);
+                state.images[index].width = canvas.width;
+                state.images[index].height = canvas.height;
+            }
+            closeModal();
+            renderSlides();
+        }
+
+        function closeModal() {
+            dom.modal.classList.add('hidden');
+            if (state.cropper) { state.cropper.destroy(); state.cropper = null; }
+        }
+
+        function setRatio(r) {
+            state.cropper?.setAspectRatio(r);
+            highlightRatioBtn(isNaN(r) ? 2 : (r === 1 ? 1 : 0));
+        }
+
+        function rotateImage() { state.cropper?.rotate(90); }
+
+        function highlightRatioBtn(idx) {
+            document.querySelectorAll('.ratio-btn').forEach((b, i) => {
+                b.className = i === idx
+                    ? 'ratio-btn flex flex-col items-center gap-1 p-2 rounded bg-zinc-800 text-[10px] text-gray-300'
+                    : 'ratio-btn flex flex-col items-center gap-1 p-2 rounded bg-zinc-800/50 text-[10px] text-gray-500';
+            });
+        }
+
+        function deleteSlide(e, id) {
+            e.stopPropagation();
+            state.images = state.images.filter(i => i.id !== id);
+            renderSlides();
+            if (state.images.length === 0) resetApp();
+        }
+
+        function resetApp() {
+            state.images = [];
+            dom.workspace.classList.add('hidden');
+            dom.navAddBtn.classList.add('hidden');
+            document.getElementById('controlsToolbar').classList.add('hidden');
+            dom.emptyState.classList.remove('hidden');
+            dom.fileInput.value = '';
+        }
+
+        // --- Export Logic (Cross-Platform) ---
+        async function handleExport() {
+            if (state.images.length === 0) return;
+            const btn = document.getElementById('exportBtn');
+            const originalHTML = btn.innerHTML;
+
+            btn.innerHTML = `<div class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>`;
+            btn.disabled = true;
+
+            try {
+                showLoading(true, 'Stitching...');
+
+                // 1. Calculate dimensions
+                let totalWidth = 0;
+                const loadedImages = await Promise.all(state.images.map(d => new Promise(res => {
+                    const img = new Image();
+                    // IMPORTANT: Do NOT set crossOrigin for local blob URLs, it breaks in Safari/Chrome
+                    img.onload = () => res({ img, w: d.width, h: d.height });
+                    img.src = d.src;
+                })));
+
+                loadedImages.forEach(i => totalWidth += i.w);
+
+                // iOS Canvas Limit Check (Approx 16MP safety net)
+                if (state.os === 'iOS' && (totalWidth * TARGET_HEIGHT) > 16000000) {
+                    alert("This carousel is very large. iOS might struggle to process it. Trying anyway...");
+                }
+
+                // 2. Draw Master Canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.ceil(totalWidth);
+                canvas.height = TARGET_HEIGHT;
+                const ctx = canvas.getContext('2d');
+
+                let xOff = 0;
+                loadedImages.forEach(({ img, w, h }) => {
+                    ctx.drawImage(img, xOff, 0, w, h);
+                    xOff += w;
+                });
+
+                // 3. Slice into 1080x1350 chunks (Instagram Portrait Standard)
+                // Use slightly less than 1080 to ensure overlap safety if needed, but 1080 is standard
+                const sliceCount = Math.ceil(totalWidth / 1080);
+                const sliceW = totalWidth / sliceCount;
+
+                const files = [];
+                for (let i = 0; i < sliceCount; i++) {
+                    const sCanvas = document.createElement('canvas');
+                    sCanvas.width = sliceW;
+                    sCanvas.height = TARGET_HEIGHT;
+                    sCanvas.getContext('2d').drawImage(canvas, i*sliceW, 0, sliceW, TARGET_HEIGHT, 0, 0, sliceW, TARGET_HEIGHT);
+
+                    const blob = await new Promise(r => sCanvas.toBlob(r, 'image/jpeg', 0.95));
+                    files.push(new File([blob], `slide_${i+1}.jpg`, { type: 'image/jpeg' }));
+                }
+
+                showLoading(false);
+
+                // 4. Export Selection (Share Sheet vs Zip)
+                if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+                    try {
+                        await navigator.share({
+                            files,
+                            title: 'Carousel Studio',
+                            text: 'Created with Carousel Studio'
+                        });
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error(err);
+                            // Fallback confirmation
+                            if (confirm("Sharing failed. Do you want to download the ZIP file instead?")) {
+                                downloadZip(files);
+                            }
+                        }
+                    }
+                } else {
+                    downloadZip(files);
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("An error occurred during processing.");
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                showLoading(false);
+            }
+        }
+
+        async function downloadZip(files) {
+            const zip = new JSZip();
+            files.forEach(f => zip.file(f.name, f));
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "carousel_images.zip");
+        }
+
+        function showLoading(show, text = 'Processing...') {
+            document.getElementById('loadingText').innerText = text;
+            dom.loading.classList.toggle('hidden', !show);
+        }
+    </script>
+</body>
+</html>
