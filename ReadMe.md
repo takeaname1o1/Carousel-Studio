@@ -43,7 +43,7 @@ To run this project locally, you need:
 1.  **Python 3.x** installed on your system.
 2.  **Flask** library.
 
-## 📦 Installation & Usage
+##  Installation & Usage
 
 1.  **Clone or Download** this repository.
 2.  Ensure the file structure is as follows:
@@ -80,8 +80,6 @@ To run this project locally, you need:
 * **`flask_app.py`**: A minimal Flask server configuration. It serves `index.html` from the root directory (`template_folder='.'`).
 * **`index.html`**: The core application. Contains all structural HTML, styling (Tailwind config), and logical JavaScript for canvas manipulation and state management.
 
-## ⚠️ Note on Offline Usage
 
-While the application logic is "local-only" (meaning it doesn't send data to a cloud server), the `index.html` file currently fetches libraries (Tailwind, Cropper, etc.) via **CDNs** (Content Delivery Networks). An internet connection is required to load the page initially. Once loaded, image processing is done offline.
 
 ---
