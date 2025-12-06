@@ -1,4 +1,7 @@
-![UI Demo](static/demo.gif)
+
+<p align="center">
+  <img src="static/demo.gif" alt="UI Demo" height="280">
+</p>
 
 # 🚀 Carousel Studio  
 **Live Demo:** https://fekig212.pythonanywhere.com/
