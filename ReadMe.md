@@ -3,12 +3,23 @@
   <img src="static/demo.gif" alt="UI Demo" height="280">
 </p>
 
-# 🚀 Carousel Studio  
+#  Carousel Studio  
 **Live Demo:** https://fekig212.pythonanywhere.com/
 
 **Carousel Studio** is a local-first, privacy-focused web application designed to create seamless Instagram swipeable panoramas. It allows users to stitch multiple images together, edit them, reorder them, and automatically slice them into perfectly sized 4:5 portrait slides (1080x1350) for Instagram.
 
-## 🚀 Features
+##  Tech Stack
+
+* **Frontend:** HTML5, JavaScript (Vanilla), Tailwind CSS (via CDN).
+* **Backend:** Python (Flask) - *Used primarily for serving the application locally.*
+* **Key Libraries:**
+    * `Cropper.js`: For image manipulation.
+    * `Sortable.js`: For drag-and-drop reordering.
+    * `JSZip` & `FileSaver.js`: For zipping and downloading files.
+    * `heic2any`: For iOS image compatibility.
+    * `Lucide`: For iconography.
+
+##  Features
 
 * **Seamless Stitching:** Automatically joins multiple photos into one continuous canvas.
 * **Smart Slicing:** Automatically cuts the stitched panorama into 1080x1350 (4:5 aspect ratio) segments optimized for Instagram Portrait mode.
@@ -25,16 +36,6 @@
     * **Mobile (iOS/Android):** Uses the native Web Share API to share directly to Instagram or save to Photos.
 * **Responsive UI:** Modern Dark Mode interface built with Tailwind CSS.
 
-## 🛠️ Tech Stack
-
-* **Frontend:** HTML5, JavaScript (Vanilla), Tailwind CSS (via CDN).
-* **Backend:** Python (Flask) - *Used primarily for serving the application locally.*
-* **Key Libraries:**
-    * `Cropper.js`: For image manipulation.
-    * `Sortable.js`: For drag-and-drop reordering.
-    * `JSZip` & `FileSaver.js`: For zipping and downloading files.
-    * `heic2any`: For iOS image compatibility.
-    * `Lucide`: For iconography.
 
 ## 📋 Prerequisites
 
@@ -75,10 +76,6 @@ To run this project locally, you need:
     * On Desktop, this will download a `carousel_images.zip`.
     * On Mobile, this will open the native sharing menu.
 
-## 📂 Project Structure
-
-* **`flask_app.py`**: A minimal Flask server configuration. It serves `index.html` from the root directory (`template_folder='.'`).
-* **`index.html`**: The core application. Contains all structural HTML, styling (Tailwind config), and logical JavaScript for canvas manipulation and state management.
 
 
 
