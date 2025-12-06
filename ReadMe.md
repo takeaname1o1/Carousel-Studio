@@ -37,7 +37,7 @@
 * **Responsive UI:** Modern Dark Mode interface built with Tailwind CSS.
 
 
-## 📋 Prerequisites
+##  Prerequisites
 
 To run this project locally, you need:
 
@@ -66,7 +66,7 @@ To run this project locally, you need:
     Open your web browser and navigate to:
     `http://127.0.0.1:5000` or `http://localhost:5000`
 
-## 🎮 How to Use
+##  How to Use
 
 1.  **Upload:** Click the "Select Photos" button or drag and drop images onto the drop zone.
 2.  **Arrange:** Drag the slides left or right to change their order.
